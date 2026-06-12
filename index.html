@@ -1604,48 +1604,107 @@ function dismissPrivacy(){
 
 // ── FINANCIAL HEALTH SCORE ────────────────────────────────────────────────────
 function calcHealthScore(){
-  let score=0; const breakdown=[];
-  // Credit utilization (25pts)
-  const tLim=S.cards.reduce((a,c)=>a+(c.limit||0),0);
-  const tBal=S.cards.reduce((a,c)=>a+(c.balance||0),0);
-  const util=tLim>0?(tBal/tLim)*100:0;
-  const uPts=util<10?25:util<30?20:util<50?12:util<75?5:0;
-  score+=uPts; breakdown.push({label:'Credit Utilization',score:uPts,max:25,detail:tLim>0?pct(util)+' utilized':'No cards'});
-  // Savings rate (20pts)
+  const hasCards=S.cards&&S.cards.length>0;
+  const hasTx=S.transactions&&S.transactions.length>0;
+  const hasBills=S.bills&&S.bills.length>0;
+  const hasSubs=S.subscriptions&&S.subscriptions.length>0;
+  const hasInv=S.investments&&S.investments.length>0;
+  const hasAssets=S.assets&&S.assets.length>0;
+  const hasAnyData=hasCards||hasTx||hasBills||hasSubs||hasInv||hasAssets;
+  if(!hasAnyData) return {score:null,label:'',color:'',breakdown:[],hasData:false,componentCount:0,totalComponents:6};
+
+  const breakdown=[];
   const curMo=new Date().toISOString().slice(0,7);
   const moIncome=S.transactions.filter(t=>t.amount>0&&!t.internalXfer&&t.incomeType&&(t.date||'').slice(0,7)===curMo).reduce((a,t)=>a+t.amount,0);
   const moExp=S.transactions.filter(t=>t.amount<0&&!t.internalXfer&&(t.date||'').slice(0,7)===curMo).reduce((a,t)=>a+Math.abs(t.amount),0);
-  const sRate=moIncome>0?((moIncome-moExp)/moIncome)*100:0;
-  const sPts=sRate>20?20:sRate>15?16:sRate>10?12:sRate>5?8:3;
-  score+=sPts; breakdown.push({label:'Savings Rate',score:sPts,max:20,detail:moIncome>0?pct(sRate)+' this month':'No income data'});
-  // Budget adherence (20pts)
-  const mb=getMonthlyBudget(); const spent=moExp;
-  const bOvr=mb>0?((spent-mb)/mb)*100:0;
-  const bPts=mb===0?10:bOvr<=0?20:bOvr<=10?15:bOvr<=25?8:0;
-  score+=bPts; breakdown.push({label:'Budget Adherence',score:bPts,max:20,detail:mb>0?(bOvr<=0?'Under budget':'+'+pct(bOvr)+' over'):'No budget set'});
-  // Emergency fund (15pts)
-  const monthlyFixed=moExp||getMonthlyBudget()||1000;
+
+  // Credit utilization (25pts) — null if no cards
+  if(hasCards){
+    const tLim=S.cards.reduce((a,c)=>a+(c.limit||0),0);
+    const tBal=S.cards.reduce((a,c)=>a+(c.balance||0),0);
+    const util=tLim>0?(tBal/tLim)*100:0;
+    const uPts=util<10?25:util<30?20:util<50?12:util<75?5:0;
+    breakdown.push({label:'Credit Utilization',score:uPts,max:25,detail:tLim>0?pct(util)+' utilized':'No limit set',hasData:true});
+  } else {
+    breakdown.push({label:'Credit Utilization',score:null,max:25,detail:'Add a credit card',hasData:false,addLink:"go('cards')"});
+  }
+
+  // Savings rate (20pts) — null if no income data
+  const hasIncome=moIncome>0;
+  if(hasIncome){
+    const sRate=((moIncome-moExp)/moIncome)*100;
+    const sPts=sRate>20?20:sRate>15?16:sRate>10?12:sRate>5?8:3;
+    breakdown.push({label:'Savings Rate',score:sPts,max:20,detail:pct(sRate)+' this month',hasData:true});
+  } else {
+    breakdown.push({label:'Savings Rate',score:null,max:20,detail:'Upload a bank CSV',hasData:false,addLink:"go('budget')"});
+  }
+
+  // Budget adherence (20pts) — null if no budget and no transactions
+  const mb=getMonthlyBudget();
+  if(mb>0||hasTx){
+    const bOvr=mb>0?((moExp-mb)/mb)*100:0;
+    const bPts=mb===0?null:bOvr<=0?20:bOvr<=10?15:bOvr<=25?8:0;
+    if(bPts!==null){
+      breakdown.push({label:'Budget Adherence',score:bPts,max:20,detail:bOvr<=0?'Under budget':'+'+pct(bOvr)+' over',hasData:true});
+    } else {
+      breakdown.push({label:'Budget Adherence',score:null,max:20,detail:'Set a budget target',hasData:false,addLink:"openBudgetModal()"});
+    }
+  } else {
+    breakdown.push({label:'Budget Adherence',score:null,max:20,detail:'Set a budget target',hasData:false,addLink:"openBudgetModal()"});
+  }
+
+  // Emergency fund (15pts) — null if no EF goal tracked
   const efGoal=S.emergencyFundGoalId?S.goals.find(g=>g.id===S.emergencyFundGoalId):null;
   const efBal=efGoal?efGoal.current:0;
-  const efMonths=efBal>0&&monthlyFixed>0?efBal/monthlyFixed:0;
-  const efPts=efMonths>=6?15:efMonths>=3?10:efMonths>=1?5:0;
-  score+=efPts; breakdown.push({label:'Emergency Fund',score:efPts,max:15,detail:efBal>0?efMonths.toFixed(1)+' months coverage':'Not tracked'});
-  // Bill payment (10pts)
-  const overdue=(S.bills||[]).filter(b=>!b.paused&&daysUntil(b.nextDue)<0).length;
-  const bPay=overdue===0?10:overdue===1?5:0;
-  score+=bPay; breakdown.push({label:'Bill Payment',score:bPay,max:10,detail:overdue===0?'No overdue bills':overdue+' overdue'});
-  // Debt load (10pts)
-  const highApr=S.cards.filter(c=>(c.apr||0)>20&&c.balance>0);
-  const dPts=highApr.length===0?10:highApr.length===1?5:0;
-  score+=dPts; breakdown.push({label:'Debt Load',score:dPts,max:10,detail:highApr.length===0?'No high-APR debt':highApr.length+' high-APR card(s)'});
+  if(efBal>0){
+    const monthlyFixed=moExp||mb||1000;
+    const efMonths=efBal/monthlyFixed;
+    const efPts=efMonths>=6?15:efMonths>=3?10:efMonths>=1?5:0;
+    breakdown.push({label:'Emergency Fund',score:efPts,max:15,detail:efMonths.toFixed(1)+' months coverage',hasData:true});
+  } else {
+    breakdown.push({label:'Emergency Fund',score:null,max:15,detail:'Link a savings account',hasData:false,addLink:"go('goals')"});
+  }
+
+  // Bill payment (10pts) — null if no bills added
+  if(hasBills){
+    const overdue=(S.bills||[]).filter(b=>!b.paused&&daysUntil(b.nextDue)<0).length;
+    const bPay=overdue===0?10:overdue===1?5:0;
+    breakdown.push({label:'Bill Payment',score:bPay,max:10,detail:overdue===0?'No overdue bills':overdue+' overdue',hasData:true});
+  } else {
+    breakdown.push({label:'Bill Payment',score:null,max:10,detail:'Add your bills',hasData:false,addLink:"go('bills')"});
+  }
+
+  // Debt load (10pts) — null if no credit cards
+  if(hasCards){
+    const highApr=S.cards.filter(c=>(c.apr||0)>20&&c.balance>0);
+    const dPts=highApr.length===0?10:highApr.length===1?5:0;
+    breakdown.push({label:'Debt Load',score:dPts,max:10,detail:highApr.length===0?'No high-APR debt':highApr.length+' high-APR card(s)',hasData:true});
+  } else {
+    breakdown.push({label:'Debt Load',score:null,max:10,detail:'Add credit cards',hasData:false,addLink:"go('cards')"});
+  }
+
+  // Scale score to available points only
+  const activeComponents=breakdown.filter(b=>b.score!==null);
+  const componentCount=activeComponents.length;
+  const availMax=activeComponents.reduce((a,b)=>a+b.max,0);
+  const rawScore=activeComponents.reduce((a,b)=>a+b.score,0);
+  const score=availMax>0?Math.round((rawScore/availMax)*100):0;
+
   const label=score>=80?'Excellent':score>=60?'Good':score>=40?'Fair':'Poor';
   const color=score>=70?'var(--green)':score>=40?'var(--yellow)':'var(--red)';
-  return {score,label,color,breakdown};
+  return {score,label,color,breakdown,hasData:true,componentCount,totalComponents:6};
 }
 
 function gaugeHTML(score,color,label){
   const r=42,cx=60,cy=60,circ=2*Math.PI*r;
   const arc=circ*0.75,gap=circ*0.25;
+  if(score===null){
+    // Empty state: grey ring, dash center
+    return `<svg class="gauge-svg" viewBox="0 0 120 120" width="160" height="160">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface3)" stroke-width="9" stroke-dasharray="${arc} ${gap}" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-225 ${cx} ${cy})"/>
+      <text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" fill="var(--dim)" font-size="28" font-weight="700" font-family="Inter,sans-serif">—</text>
+    </svg>`;
+  }
   const filled=arc*(score/100);
   return `<svg class="gauge-svg" viewBox="0 0 120 120" width="160" height="160">
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface3)" stroke-width="9" stroke-dasharray="${arc} ${gap}" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-225 ${cx} ${cy})"/>
@@ -1655,11 +1714,54 @@ function gaugeHTML(score,color,label){
   </svg>`;
 }
 
+function _scoreReliabilityBadge(componentCount,totalComponents){
+  if(componentCount>=totalComponents) return '<span style="font-size:11px;color:var(--green)">● Complete score</span>';
+  if(componentCount>=3) return '<span style="font-size:11px;color:var(--yellow)">● Partial score — add more accounts</span>';
+  return '<span style="font-size:11px;color:var(--red)">● Limited score — add more accounts</span>';
+}
+
 function showHealthBreakdown(){
-  const {score,label,color,breakdown}=calcHealthScore();
+  const {score,label,color,breakdown,hasData,componentCount,totalComponents}=calcHealthScore();
+  if(!hasData){
+    const COMPONENT_HINTS=[
+      {label:'Credit Utilization',hint:'Add a credit card',link:"closeModal('m-health');go('cards')"},
+      {label:'Savings Rate',hint:'Upload a bank CSV',link:"closeModal('m-health');go('budget')"},
+      {label:'Budget Adherence',hint:'Set a budget',link:"closeModal('m-health');openBudgetModal()"},
+      {label:'Emergency Fund',hint:'Link a savings account',link:"closeModal('m-health');go('goals')"},
+      {label:'Bill Payment',hint:'Add your bills',link:"closeModal('m-health');go('bills')"},
+      {label:'Debt Load',hint:'Add credit cards',link:"closeModal('m-health');go('cards')"},
+    ];
+    $('health-breakdown-body').innerHTML=`
+      <div style="text-align:center;padding:24px 0 16px">
+        <div style="font-size:48px;margin-bottom:12px">📊</div>
+        <div style="font-size:1rem;font-weight:600;margin-bottom:8px">Your score will appear once you add your financial accounts.</div>
+        <div class="text-muted" style="font-size:0.875rem;margin-bottom:24px">Each component below feeds into your score.</div>
+      </div>
+      ${COMPONENT_HINTS.map(h=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:0.9rem;color:var(--muted)">${h.label}</span>
+          <button class="btn btn-ghost btn-xs" onclick="${h.link}">${h.hint} →</button>
+        </div>`).join('')}`;
+    openModal('m-health');
+    return;
+  }
   $('health-breakdown-body').innerHTML=`
-    <div style="text-align:center;margin-bottom:24px">${gaugeHTML(score,color,label)}</div>
+    <div style="text-align:center;margin-bottom:16px">${gaugeHTML(score,color,label)}</div>
+    <div style="text-align:center;margin-bottom:20px">${_scoreReliabilityBadge(componentCount,totalComponents)}</div>
     ${breakdown.map(b=>{
+      if(!b.hasData){
+        return `<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);opacity:.55">
+          <div class="flex-sb mb6">
+            <span style="font-size:1rem;font-weight:600">${b.label}</span>
+            <span style="font-size:0.875rem;color:var(--dim)">No data</span>
+          </div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:0%;background:var(--surface3)"></div></div>
+          <div style="font-size:0.875rem;margin-top:6px;display:flex;align-items:center;gap:8px">
+            <span class="text-muted">${b.detail}</span>
+            ${b.addLink?`<button class="btn btn-ghost btn-xs" onclick="${b.addLink}">Add →</button>`:''}
+          </div>
+        </div>`;
+      }
       const pts_clr=b.score===b.max?'var(--green)':b.score>0?'var(--yellow)':'var(--red)';
       return `<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
         <div class="flex-sb mb6">
@@ -2565,9 +2667,17 @@ function renderHome(){
       ${S.userProfile?`<div class="mt8"><span class="profile-badge">${(PROFILES[S.userProfile]||{}).icon||''} ${(PROFILES[S.userProfile]||{}).name||''}</span></div>`:''}
     </div>
     <div class="gauge-wrap" id="health-score-section">
-      ${gaugeHTML(health.score,health.color,health.label)}
-      <div class="gauge-tip">${health.breakdown.find(b=>b.score<b.max)?'Improve: '+health.breakdown.filter(b=>b.score<b.max).sort((a,b)=>a.score/a.max-b.score/b.max)[0].label:''}</div>
-      <button class="btn btn-ghost btn-sm mt8" onclick="showHealthBreakdown()">View breakdown</button>
+      ${health.hasData===false?`
+        ${gaugeHTML(null,'','')}
+        <div class="gauge-tip" style="color:var(--muted);font-size:12px">No data yet</div>
+        <div style="font-size:11px;color:var(--dim);text-align:center;margin-top:4px;max-width:140px">Add accounts to calculate your financial health score</div>
+        <button class="btn btn-ghost btn-sm mt8" onclick="showHealthBreakdown()">Get started →</button>
+      `:`
+        ${gaugeHTML(health.score,health.color,health.label)}
+        <div class="gauge-tip">${health.breakdown.filter(b=>b.hasData&&b.score<b.max).sort((a,b)=>a.score/a.max-b.score/b.max)[0]?'Improve: '+health.breakdown.filter(b=>b.hasData&&b.score<b.max).sort((a,b)=>a.score/a.max-b.score/b.max)[0].label:''}</div>
+        <div style="text-align:center;margin-top:4px">${_scoreReliabilityBadge(health.componentCount,health.totalComponents)}</div>
+        <button class="btn btn-ghost btn-sm mt8" onclick="showHealthBreakdown()">View breakdown</button>
+      `}
     </div>
   </div>
 
