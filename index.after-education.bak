@@ -125,6 +125,7 @@ select.form-input{cursor:pointer;appearance:none;background-image:url("data:imag
 .bar-orange{background:#FF8C00}
 .bar-red{background:#FF4D6D}
 .bar-accent{background:linear-gradient(90deg,var(--accent),var(--purple))}
+.mf-band{transition:fill-opacity .15s ease}.mf-band:hover{fill-opacity:.85}
 .bar-util{background:#FF4D6D}
 
 /* TABLES */
@@ -178,6 +179,15 @@ tbody tr:hover td{background:var(--surface2)}
 @keyframes modalIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
 .modal-title{font-size:17px;font-weight:700;margin-bottom:20px}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+#app-dlg{z-index:3000}
+#app-dlg .modal{max-width:420px}
+.dlg-msg{font-size:14px;line-height:1.55;color:var(--text-sec);white-space:pre-line}
+.dlg-msg:not(:last-child){margin-bottom:14px}
+.dlg-label{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.dlg-field{position:relative}
+.dlg-prefix{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:600;pointer-events:none}
+.dlg-field.has-prefix .form-input{padding-left:28px}
+.dlg-err{color:var(--red);font-size:12px;margin-top:8px;min-height:16px}
 
 /* ALERTS / BANNERS */
 .alert{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r-sm);font-size:13px;margin-bottom:14px}
@@ -1478,7 +1488,7 @@ tbody tr:hover td{background:var(--surface2)}
         <option>Bills</option><option>Subscriptions</option><option>Shopping</option>
         <option>Medical</option><option>Entertainment</option>
         <option>Charity</option><option>Investments</option><option>Credit Card Payments</option>
-        <option>Transfers</option><option>Other</option>
+        <option>Education</option><option>Fees</option><option>Transfers</option><option>Other</option>
       </select>
     </div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-bottom:4px">
@@ -1638,7 +1648,7 @@ tbody tr:hover td{background:var(--surface2)}
           <option>Bills</option><option>Subscriptions</option><option>Shopping</option>
           <option>Medical</option><option>Entertainment</option>
           <option>Charity</option><option>Investments</option><option>Credit Card Payments</option>
-          <option>Transfers</option><option>Other</option>
+          <option>Education</option><option>Fees</option><option>Transfers</option><option>Other</option>
         </select>
       </div>
     </div>
@@ -1658,6 +1668,22 @@ tbody tr:hover td{background:var(--surface2)}
       <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
       <button class="btn btn-ghost" onclick="closeModal('m-datasummary')">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- Vault ledger (how a vault balance is reconstructed) -->
+<div class="overlay" id="m-vault-ledger">
+  <div class="modal" style="max-width:900px" onclick="event.stopPropagation()">
+    <div class="flex-sb mb12"><div class="modal-title" style="margin:0" id="vl-title">Vault ledger</div><button class="btn btn-ghost btn-sm" onclick="closeModal('m-vault-ledger')">Close</button></div>
+    <div id="vl-body"></div>
+  </div>
+</div>
+<!-- In-app dialogs (replace native prompt / confirm / alert) -->
+<div class="overlay" id="app-dlg" role="dialog" aria-modal="true" aria-labelledby="app-dlg-title">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title" id="app-dlg-title"></div>
+    <div id="app-dlg-body"></div>
+    <div class="modal-actions" id="app-dlg-actions"></div>
   </div>
 </div>
 
@@ -4134,8 +4160,8 @@ function saveCreditScore(){
   AnchorDB.creditScoreHistory.sort((a,b)=>a.date.localeCompare(b.date));
   save(); closeModal('m-credit-score'); renderCards();
 }
-function deleteCreditScoreEntry(idx){
-  if(!confirm('Delete this score entry?')) return;
+async function deleteCreditScoreEntry(idx){
+  if(!await appConfirm('Delete this score entry?',{danger:true,confirmText:'Delete'})) return;
   AnchorDB.creditScoreHistory.splice(idx,1);
   save(); renderCards();
 }
@@ -4211,7 +4237,7 @@ function openSettings(){
       <div class="flex gap8" style="flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="closeModal('m-settings');openIncomeQuiz()">Income quiz →</button>
         <button class="btn btn-ghost btn-sm" onclick="closeModal('m-settings');openIncomeConfig()">Enter exact amounts</button>
-        ${AnchorDB.income.configuration.configuredManually?`<button class="btn btn-danger btn-sm" onclick="if(confirm('Clear income configuration? DTI will revert to auto-detected estimates.')){AnchorDB.income.configuration={dtiIncomeBase:'net',sources:[],bonusHistory:[],monthlyBonusAverage:0,totalMonthlyGross:0,totalMonthlyNet:0,totalDTIEligible:0,configuredAt:null,configuredManually:false};S.incomeSettings={...(S.incomeSettings||{}),manualMonthlyNet:0,grossMonthly:0};DataStore.sync('income-deleted');closeModal('m-settings');}">Delete income data</button>`:''}
+        ${AnchorDB.income.configuration.configuredManually?`<button class="btn btn-danger btn-sm" onclick="appConfirm('Clear income configuration? DTI will revert to auto-detected estimates.',{danger:true,confirmText:'Clear'}).then(function(ok){if(ok){AnchorDB.income.configuration={dtiIncomeBase:'net',sources:[],bonusHistory:[],monthlyBonusAverage:0,totalMonthlyGross:0,totalMonthlyNet:0,totalDTIEligible:0,configuredAt:null,configuredManually:false};S.incomeSettings={...(S.incomeSettings||{}),manualMonthlyNet:0,grossMonthly:0};DataStore.sync('income-deleted');closeModal('m-settings');}})">Delete income data</button>`:''}
       </div>
     </div>
     <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)">
@@ -4262,8 +4288,8 @@ function openSettings(){
         <button class="btn btn-ghost btn-sm" onclick="closeModal('m-settings');go('budget','income');setTimeout(()=>{const f=document.querySelector('[onclick*=incomeQuiz],[onclick*=openIncomeConfig]');},200)">View income data</button>
       </div>
       <div class="flex gap8" style="flex-wrap:wrap">
-        <button class="btn btn-danger btn-sm" onclick="if(confirm('Delete transaction history? This removes all uploaded CSV data but keeps settings, cards, and goals.')){S.transactions=[];S.balanceHistory={};DataStore.sync('tx-deleted');closeModal('m-settings');}">Delete transactions</button>
-        <button class="btn btn-danger btn-sm" onclick="if(confirm('Delete investment data?')){S.investments=[];DataStore.sync('invest-deleted');closeModal('m-settings');}">Delete investments</button>
+        <button class="btn btn-danger btn-sm" onclick="appConfirm('Delete transaction history? This removes all uploaded CSV data but keeps settings, cards, and goals.',{danger:true,confirmText:'Delete'}).then(function(ok){if(ok){S.transactions=[];S.balanceHistory={};DataStore.sync('tx-deleted');closeModal('m-settings');}})">Delete transactions</button>
+        <button class="btn btn-danger btn-sm" onclick="appConfirm('Delete investment data?',{danger:true,confirmText:'Delete'}).then(function(ok){if(ok){S.investments=[];DataStore.sync('invest-deleted');closeModal('m-settings');}})">Delete investments</button>
         <button class="btn btn-danger btn-sm" onclick="closeModal('m-settings');clearAllData()">Clear ALL data</button>
       </div>
     </div>
@@ -4433,10 +4459,14 @@ function confirmPayday(dateStr,amount){
   else S.paydayHistory.push({date:dateStr,amount:amount||0,source:'manual',confirmed:true});
   save();renderHome();
 }
-function _pdsEditAmount(){
+async function _pdsEditAmount(){
   const cur=getPaydayAmount();
-  const v=prompt('Estimated paycheck amount:',cur?Math.round(cur):'');
-  if(v!==null&&!isNaN(parseFloat(v))){if(!S.payScheduleConfig)S.payScheduleConfig={type:'biweekly'};S.payScheduleConfig.manualAmount=parseFloat(v);save();renderBudget();}
+  const num=v=>parseFloat(String(v).replace(/[$,\s]/g,''));
+  const v=await appPrompt('Estimated paycheck amount',{label:'Amount per paycheck',prefix:'$',inputmode:'decimal',placeholder:'0.00',value:cur?Math.round(cur):'',confirmText:'Save',
+    validate:s=>{const n=num(s);return(isNaN(n)||n<0)?'Enter a valid amount.':'';}});
+  if(v===null) return;
+  if(!S.payScheduleConfig)S.payScheduleConfig={type:'biweekly'};
+  S.payScheduleConfig.manualAmount=num(v);save();renderBudget();
 }
 
 // ── PAYCHECK PLANNER ──────────────────────────────────────────────────────────
@@ -5074,14 +5104,15 @@ function saveCard(){
   const issuer=$('f-card-issuer').value;
   const apr=parseFloat($('f-card-apr').value)||0;
   const rewards=$('f-card-rewards').value;
-  if(editId){ const c=S.cards.find(x=>x.id===editId); if(c){c.name=name;c.limit=limit;c.balance=balance;c.cardType=cardType;c.issuer=issuer;c.apr=apr;c.rewards=rewards;} }
-  else S.cards.push({id:uid(),name,limit,balance,cardType,issuer,apr,rewards});
+  if(editId){ const c=S.cards.find(x=>x.id===editId); if(c){ if(c.balance!==balance){c.balanceAsOf=_ccToday();c.needsBalance=false;} c.name=name;c.limit=limit;c.balance=balance;c.cardType=cardType;c.issuer=issuer;c.apr=apr;c.rewards=rewards;} }
+  else S.cards.push({id:uid(),name,limit,balance,cardType,issuer,apr,rewards,balanceAsOf:_ccToday()});
   syncCardLiabilities();
   save(); closeModal('m-card'); renderCards(); showSaveToast('Card saved');
 }
-function deleteCard(id){ if(!confirm('Delete this card?')) return; S.cards=S.cards.filter(x=>x.id!==id); syncCardLiabilities(); save(); renderCards() }
+async function deleteCard(id){ if(!await appConfirm('Delete this card?',{danger:true,confirmText:'Delete'})) return; S.cards=S.cards.filter(x=>x.id!==id); syncCardLiabilities(); save(); renderCards() }
 
 function renderCards(){
+  _cardBalanceMigrate();
   const el=$('cards-body');
   if(!S.cards.length){
     el.innerHTML=`<div class="empty"><div class="empty-icon">💳</div><div>No credit cards added yet.<br>Click "+ Add Card" to get started, or "Upload Statement" to import a CSV.</div></div>`;
@@ -5118,9 +5149,10 @@ function renderCards(){
 
   el.innerHTML=`
   ${highAprCards.length>0?`<div class="alert alert-warn" style="margin-bottom:16px">⚠ <strong>High APR ${highAprCards.length>1?'cards':'card'}:</strong> ${highAprCards.map(c=>`${esc(c.name)} (${c.apr}%)`).join(', ')} — minimize balances to reduce interest costs.</div>`:''}
+  ${S.cards.filter(c=>c.needsBalance).map(c=>`<div class="alert alert-warn" style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="flex:1;min-width:220px">⚠ <strong>${esc(c.name)} balance isn't confirmed.</strong> Imported statements show activity, not what you owe — enter the balance your bank shows today and Anchor will track from there.</span><button class="btn btn-primary btn-sm" onclick="promptCardBalance('${c.id}')">Confirm balance</button></div>`).join('')}
 
   <div class="${interestYTD?'g4':'g3'} mb16">
-    <div class="stat"><div class="stat-label">Total Balance</div><div class="stat-value ${totalBal>0?'text-red':'text-green'}">${fmt(totalBal)}</div><div class="stat-sub">${S.cards.length} card${S.cards.length!==1?'s':''}</div></div>
+    <div class="stat"><div class="stat-label">Total Balance</div><div class="stat-value ${totalBal>0?'text-red':'text-green'}">${fmt(totalBal)}</div><div class="stat-sub">${S.cards.length} card${S.cards.length!==1?'s':''}${S.cards.some(c=>c.needsBalance)?' · unconfirmed':''}</div></div>
     <div class="stat"><div class="stat-label">Total Limit</div><div class="stat-value">${fmt(totalLim)}</div><div class="stat-sub">Available: ${fmt(totalLim-totalBal)}</div></div>
     <div class="stat"><div class="stat-label">Overall Utilization</div><div class="stat-value ${utilTxt(overall)}">${pct(overall)}</div><div class="stat-sub">${overall<30?'Good standing':overall<50?'Moderate – watch this':'High – reduce debt urgently'}</div><div class="bar-wrap mt8"><div class="bar-fill ${utilCls(overall)}" style="width:${Math.min(overall,100)}%"></div></div></div>
     ${interestYTD?`<div class="stat"><div class="stat-label">Interest Paid YTD</div><div class="stat-value text-red">${fmt(interestYTD)}</div><div class="stat-sub">${curYear} year to date</div></div>`:''}
@@ -5249,6 +5281,7 @@ function renderCards(){
                 ${cardInt>0?`<div class="fs11" style="color:#f59e0b">Interest YTD: ${fmt(cardInt)}</div>`:''}
                 ${lastPmt?`<div class="fs11 text-muted">Last pmt: ${fmt(lastPmt.amount)} on ${lastPmt.date}</div>`:''}
                 ${c.lastStatement?`<div class="fs11 text-muted">Statement thru: ${c.lastStatement}</div>`:''}
+                ${c.balanceAsOf?`<div class="fs11 text-muted">Balance as of ${c.balanceAsOf}</div>`:''}
                 ${i===0&&S.cards.length>1?'<div class="fs11 text-yellow">Highest utilization — pay first</div>':''}
               </td>
               <td class="${c.balance>0?'text-red':'text-green'} fw7">${fmt(c.balance)}</td>
@@ -5380,9 +5413,11 @@ function doCCParse(){
 
         // BofA CC: negative = charge, positive = payment/credit
         const isInterest=/interest charged/i.test(rawDesc);
-        const isPayment=!isInterest&&(/payment from|online\/mobile recurring from|mobile payment|autopay/i.test(rawDesc)||amt>0)&&amt>0;
-        const kind=isInterest?'interest':isPayment?'payment':'charge';
-        pending.push({date:rawDate||today,description:rawDesc,amount:amt,kind,category:kind==='charge'?autoCat(rawDesc):(kind==='payment'?'Transfers':'Interest'),include:true});
+        const isPayment=!isInterest&&amt>0&&/payment from|online\/mobile recurring from|mobile payment|autopay|atm payment|online payment|payment[\s-]*thank/i.test(rawDesc);
+        const isRefund=!isInterest&&amt>0&&!isPayment;   // merchant refund / statement credit: lowers the balance but is NOT a payment
+        const isAdvance=!isInterest&&amt<0&&!isFeeDesc(rawDesc)&&/cash advance|balance transfer/i.test(rawDesc);   // money moved to another account, not spending
+        const kind=isInterest?'interest':isPayment?'payment':isRefund?'refund':isAdvance?'advance':'charge';
+        pending.push({date:rawDate||today,description:rawDesc,amount:amt,kind,ref:String(row['Reference Number']||'').trim(),category:kind==='charge'?autoCat(rawDesc):(kind==='interest'?'Interest':'Transfers'),include:true});
       });
 
       pendingCCFile=null;
@@ -5402,7 +5437,7 @@ function _csvCCPreviewRows(rows){
   return rows.map((r,i)=>`<tr>
     <td class="text-muted" style="white-space:nowrap">${esc(r.date)}</td>
     <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.description)}">${esc(r.description)}</td>
-    <td class="fw7 ${r.kind==='charge'?'text-red':'text-green'}" style="white-space:nowrap">${r.kind==='charge'?'-':'+'}${fmt(Math.abs(r.amount))}</td>
+    <td class="fw7 ${(r.kind==='charge'||r.kind==='advance'||r.kind==='interest')?'text-red':'text-green'}" style="white-space:nowrap">${(r.kind==='charge'||r.kind==='advance'||r.kind==='interest')?'-':'+'}${fmt(Math.abs(r.amount))}</td>
     <td class="text-muted fs11" style="white-space:nowrap;text-transform:capitalize">${r.kind}</td>
     <td style="text-align:center"><input type="checkbox" ${r.include?'checked':''} onchange="_csvPendingRows[${i}].include=this.checked"></td>
   </tr>`).join('');
@@ -5410,7 +5445,7 @@ function _csvCCPreviewRows(rows){
 function showCCPreview(){
   const body=$('csv-preview-body'), actions=$('csv-preview-actions');
   const rows=_csvPendingRows, meta=_csvPendingMeta;
-  const charges=rows.filter(r=>r.kind==='charge'), payments=rows.filter(r=>r.kind==='payment'), interest=rows.filter(r=>r.kind==='interest');
+  const charges=rows.filter(r=>r.kind==='charge'||r.kind==='advance'), payments=rows.filter(r=>r.kind==='payment'||r.kind==='refund'), interest=rows.filter(r=>r.kind==='interest');
   const chargeAmt=charges.reduce((a,r)=>a+Math.abs(r.amount),0);
   const paymentAmt=payments.reduce((a,r)=>a+r.amount,0);
   const interestAmt=interest.reduce((a,r)=>a+Math.abs(r.amount),0);
@@ -5425,7 +5460,7 @@ function showCCPreview(){
     ${lowConf?`<div class="pdf-warning">Column detection confidence is low for this file — double-check Date/Amount look right below.</div>`:''}
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
       <div class="stat" style="padding:10px 12px"><div class="stat-label">Charges</div><div class="stat-value text-red" style="font-size:18px">${fmt(chargeAmt)}</div><div class="stat-sub">${charges.length}</div></div>
-      <div class="stat" style="padding:10px 12px"><div class="stat-label">Payments</div><div class="stat-value text-green" style="font-size:18px">${fmt(paymentAmt)}</div><div class="stat-sub">${payments.length}</div></div>
+      <div class="stat" style="padding:10px 12px"><div class="stat-label">Payments &amp; credits</div><div class="stat-value text-green" style="font-size:18px">${fmt(paymentAmt)}</div><div class="stat-sub">${payments.length}</div></div>
       <div class="stat" style="padding:10px 12px"><div class="stat-label">Interest</div><div class="stat-value text-red" style="font-size:18px">${fmt(interestAmt)}</div><div class="stat-sub">${interest.length}</div></div>
     </div>
     <div class="fw7 mb8 fs13">Preview <span class="text-muted fw4 fs11">(first ${preview.length} of ${rows.length})</span></div>
@@ -5442,79 +5477,145 @@ function showCCPreview(){
 }
 
 // COMMIT — credit card statement CSV (creates the card here, not at parse time,
-// so cancelling the preview never leaves a phantom card behind)
-function importCCTransactions(){
+// so cancelling the preview never leaves a phantom card behind).
+// Balance rule: a card's balance is a number you CONFIRMED as of a date (balanceAsOf).
+// An import records every line, but only NEW lines dated AFTER that date move the balance —
+// statements already inside the confirmed balance can never be counted twice, and re-importing
+// the same file changes nothing. Interest and cash advances raise the balance; payments and refunds lower it.
+async function importCCTransactions(){
   const meta=_csvPendingMeta;
   const toImport=_csvPendingRows.filter(r=>r.include);
   if(!toImport.length){closeModal('m-csv-preview');showSaveToast('No lines selected');return;}
 
   let targetCard=null;
   if(meta.cardSel==='_new'){
-    targetCard={id:uid(),name:meta.newName,limit:0,balance:0,cardType:'',issuer:'',apr:0,rewards:'none',interestHistory:[],payments:[],lastStatement:'',lastPayment:null};
+    targetCard={id:uid(),name:meta.newName,limit:0,balance:0,cardType:'',issuer:'',apr:0,rewards:'none',interestHistory:[],payments:[],lastStatement:'',lastPayment:null,balanceAsOf:'',needsBalance:true};
     S.cards.push(targetCard);
   } else {
     targetCard=S.cards.find(c=>c.id===meta.cardSel);
     if(!targetCard){alert('Card not found.');closeModal('m-csv-preview');return;}
   }
 
-  const today=new Date().toISOString().slice(0,10);
-  const stats={charges:0,chargeAmt:0,payments:0,paymentAmt:0,interest:0,interestAmt:0,cats:{},newTx:0,skipped:0};
+  const today=_ccToday();
+  const asOf=targetCard.balanceAsOf||'';
+  const stats={charges:0,chargeAmt:0,payments:0,paymentAmt:0,refunds:0,refundAmt:0,interest:0,interestAmt:0,cats:{},newTx:0,skipped:0,balanceDelta:0,beforeAnchor:0,noAnchor:!asOf,asOf};
+  const cents=v=>Math.round(Math.abs(v)*100);
+  const prior=S.transactions.filter(t=>t.account===targetCard.name);   // what existed BEFORE this import
+  const seen={};
+  // Duplicate = same bank reference number, or (no reference) same date+description+amount seen more
+  // times in this file than already stored. Two genuine identical purchases on one day both survive.
+  const isDupTx=(nd,desc,amt,ref)=>{
+    if(ref&&prior.some(t=>t.ref===ref)) return true;
+    const key=nd+'|'+desc+'|'+cents(amt);
+    const have=prior.filter(t=>(normalizeDate(t.date)||t.date)===nd&&cents(t.amount)===cents(amt)&&(t.description===desc||t.desc===desc)).length;
+    const n=seen[key]||0; seen[key]=n+1;
+    return n<have;
+  };
   let latestDate='';
 
   toImport.forEach(r=>{
-    const rawDesc=r.description,rawDate=r.date,amt=r.amount;
-    if(r.kind==='interest'){
-      stats.interest++;
+    const rawDesc=r.description,amt=r.amount,kind=r.kind;
+    const nd=normalizeDate(r.date)||r.date||today;
+    if(nd&&(!latestDate||nd>latestDate)) latestDate=nd;
+    const move=delta=>{ if(asOf&&nd>asOf) stats.balanceDelta+=delta; else if(asOf) stats.beforeAnchor++; };   // only lines after the confirmed date move the balance
+
+    if(kind==='interest'){
       const absAmt=Math.abs(amt);
-      stats.interestAmt+=absAmt;
       if(!targetCard.interestHistory) targetCard.interestHistory=[];
-      const already=targetCard.interestHistory.find(h=>h.date===rawDate&&Math.abs(h.amount-absAmt)<0.01);
-      if(!already) targetCard.interestHistory.push({date:rawDate||today,amount:absAmt});
+      const already=targetCard.interestHistory.find(h=>(normalizeDate(h.date)||h.date)===nd&&Math.abs(h.amount-absAmt)<0.01);
+      if(already){stats.skipped++;return;}
+      targetCard.interestHistory.push({date:nd,amount:absAmt});
+      stats.interest++; stats.interestAmt+=absAmt;
+      move(absAmt);
       return;
     }
-    if(r.kind==='payment'){
-      stats.payments++;
-      stats.paymentAmt+=amt;
-      if(!targetCard.payments) targetCard.payments=[];
-      const already=targetCard.payments.find(h=>h.date===rawDate&&Math.abs(h.amount-amt)<0.01);
-      if(!already){
-        targetCard.payments.push({date:rawDate||today,amount:amt});
-        if(!targetCard.lastPayment||rawDate>targetCard.lastPayment.date)
-          targetCard.lastPayment={date:rawDate||today,amount:amt};
+    if(kind==='payment'||kind==='refund'){
+      if(isDupTx(nd,rawDesc,amt,r.ref)){stats.skipped++;return;}
+      const tx={id:uid(),date:nd,description:rawDesc,amount:amt,category:'Transfers',account:targetCard.name,source:'cc-csv',isPayment:true};
+      if(r.ref) tx.ref=r.ref;
+      if(kind==='refund'){
+        tx.isRefund=true; stats.refunds++; stats.refundAmt+=amt;      // a refund is not a payment: keep it out of payment history
+      } else {
+        stats.payments++; stats.paymentAmt+=amt;
+        if(!targetCard.payments) targetCard.payments=[];
+        targetCard.payments.push({date:nd,amount:amt});
+        const lp=targetCard.lastPayment&&(normalizeDate(targetCard.lastPayment.date)||targetCard.lastPayment.date);
+        if(!lp||nd>lp) targetCard.lastPayment={date:nd,amount:amt};
       }
-      const payDup=S.transactions.find(t=>t.date===rawDate&&t.amount===amt&&(t.description===rawDesc||t.desc===rawDesc)&&t.account===targetCard.name&&t.isPayment);
-      if(!payDup) S.transactions.push({id:uid(),date:rawDate||today,description:rawDesc,amount:amt,category:'Transfers',account:targetCard.name,source:'cc-csv',isPayment:true});
+      S.transactions.push(tx);
+      move(-amt);
       return;
     }
-    // charge (negative in BofA CC = spending)
+    // charge or cash advance (negative in a BofA CC export)
     const chargeAmt=Math.abs(amt);
-    stats.charges++;
-    stats.chargeAmt+=chargeAmt;
-    if(rawDate&&(!latestDate||rawDate>latestDate)) latestDate=rawDate;
-    const cat=autoCat(rawDesc);
-    stats.cats[cat]=(stats.cats[cat]||0)+chargeAmt;
-    const dup=S.transactions.find(t=>t.date===rawDate&&Math.abs(Math.abs(t.amount)-chargeAmt)<0.01&&(t.description===rawDesc||t.desc===rawDesc)&&t.account===targetCard.name);
-    if(dup){stats.skipped++;return;}
-    S.transactions.push({id:uid(),date:rawDate||today,description:rawDesc,amount:-chargeAmt,category:cat,account:targetCard.name,source:'cc-csv'});
+    if(isDupTx(nd,rawDesc,chargeAmt,r.ref)){stats.skipped++;return;}
+    const adv=kind==='advance';
+    stats.charges++; stats.chargeAmt+=chargeAmt;
+    const cat=adv?'Transfers':autoCat(rawDesc);
+    if(!adv) stats.cats[cat]=(stats.cats[cat]||0)+chargeAmt;
+    const tx={id:uid(),date:nd,description:rawDesc,amount:-chargeAmt,category:cat,account:targetCard.name,source:'cc-csv'};
+    if(adv) tx.internalXfer=true;      // cash advance to checking: debt goes up, but it is not spending
+    if(r.ref) tx.ref=r.ref;
+    S.transactions.push(tx);
     stats.newTx++;
+    move(chargeAmt);
   });
 
-  if(latestDate&&(!targetCard.lastStatement||latestDate>targetCard.lastStatement))
-    targetCard.lastStatement=latestDate;
-  const net=stats.chargeAmt-stats.paymentAmt;
-  if(net!==0) targetCard.balance=Math.max(0,targetCard.balance+net);
+  const lastSt=targetCard.lastStatement&&(normalizeDate(targetCard.lastStatement)||targetCard.lastStatement);
+  if(latestDate&&(!lastSt||latestDate>lastSt)) targetCard.lastStatement=latestDate;
+  if(asOf&&stats.balanceDelta!==0) targetCard.balance=Math.round((targetCard.balance+stats.balanceDelta)*100)/100;
+  if(!asOf) targetCard.needsBalance=true;
 
   syncCardLiabilities();
   detectCrossAccountDuplicates();
   autoClassifyNeedsReview();
   DataStore.sync('cc-csv-upload');
   closeModal('m-csv-preview');
+  if(!targetCard.balanceAsOf) await promptCardBalance(targetCard.id);
+  stats.noAnchor=!targetCard.balanceAsOf;
   showStatementSummary(stats,targetCard.name);
+}
+
+// Ask for the balance the bank shows today and make it the anchor future imports build on.
+async function promptCardBalance(id){
+  const c=S.cards.find(x=>x.id===id); if(!c) return;
+  const v=await appPrompt('Confirm card balance',{
+    message:'Statements show activity, not what you owe. Enter the balance your bank shows for '+c.name+' right now and Anchor will track from there.',
+    label:'Balance today',prefix:'$',inputmode:'decimal',value:'',placeholder:'0.00',confirmText:'Save balance',
+    validate:function(x){const n=parseFloat(String(x).replace(/[$,\s]/g,''));return (isNaN(n)||n<0)?'Enter a number, like 3780.00':'';}
+  });
+  if(v===null||v===undefined) return;
+  c.balance=Math.round(parseFloat(String(v).replace(/[$,\s]/g,''))*100)/100;
+  c.balanceAsOf=_ccToday(); c.needsBalance=false;
+  syncCardLiabilities(); save(); renderCards(); showSaveToast('Balance saved');
+}
+function _ccToday(){ return new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10); }
+// One-time upgrade for cards saved before balanceAsOf existed, plus ISO dates on card-CSV rows
+function _cardBalanceMigrate(){
+  let ch=false;
+  (S.cards||[]).forEach(c=>{
+    if(c.balanceAsOf===undefined){
+      const hasCsv=(S.transactions||[]).some(t=>t.account===c.name&&t.source==='cc-csv');
+      if(hasCsv){c.balanceAsOf='';c.needsBalance=true;} else {c.balanceAsOf=_ccToday();}
+      ch=true;
+    }
+  });
+  if(!AnchorDB.ccDatesFixed){
+    (S.transactions||[]).forEach(t=>{ if(t.source==='cc-csv'){const n=normalizeDate(t.date); if(n&&n!==t.date){t.date=n;ch=true;}} });
+    (S.cards||[]).forEach(c=>{
+      (c.interestHistory||[]).forEach(h=>{const n=normalizeDate(h.date); if(n&&n!==h.date){h.date=n;ch=true;}});
+      (c.payments||[]).forEach(h=>{const n=normalizeDate(h.date); if(n&&n!==h.date){h.date=n;ch=true;}});
+      if(c.lastPayment){const n=normalizeDate(c.lastPayment.date); if(n&&n!==c.lastPayment.date){c.lastPayment.date=n;ch=true;}}
+      if(c.lastStatement){const n=normalizeDate(c.lastStatement); if(n&&n!==c.lastStatement){c.lastStatement=n;ch=true;}}
+    });
+    AnchorDB.ccDatesFixed=true; ch=true;
+  }
+  if(ch) save();
 }
 
 function showStatementSummary(stats,cardName){
   const top3=Object.entries(stats.cats).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  const net=stats.chargeAmt-stats.paymentAmt;
+  const net=stats.balanceDelta||0;
   $('m-statement-body').innerHTML=`
     <div class="fw7 mb10">Card: ${esc(cardName)}</div>
     <div class="g2 mb12" style="gap:8px">
@@ -5523,6 +5624,8 @@ function showStatementSummary(stats,cardName){
       ${stats.interestAmt>0?`<div class="stat" style="padding:10px"><div class="stat-label">Interest Charged</div><div class="stat-value text-red fs16">${fmt(stats.interestAmt)}</div><div class="stat-sub">${stats.interest} charge${stats.interest!==1?'s':''}</div></div>`:''}
       <div class="stat" style="padding:10px"><div class="stat-label">Net Balance Change</div><div class="stat-value ${net>0?'text-red':'text-green'} fs16">${net>0?'+':''}${fmt(net)}</div><div class="stat-sub">${stats.newTx} new tx imported</div></div>
     </div>
+    ${stats.noAnchor?`<div class="alert alert-warn fs12 mb10">Balance not changed — enter your bank's balance on the Credit Cards page so Anchor can track from it.</div>`:(stats.beforeAnchor>0?`<div class="fs12 text-muted mb10">${stats.beforeAnchor} line${stats.beforeAnchor!==1?'s':''} dated on or before your balance date (${esc(stats.asOf)}) were recorded but not added to the balance — it already includes them.</div>`:'')}
+    ${stats.refunds>0?`<div class="fs12 text-muted mb10">${stats.refunds} refund${stats.refunds!==1?'s':''} / credit${stats.refunds!==1?'s':''} (${fmt(stats.refundAmt)}) lowered the balance but are not counted as payments.</div>`:''}
     ${top3.length?`<div class="fw7 fs12 mb6">Top Spending Categories</div>
     <div style="display:flex;flex-direction:column;gap:6px">
       ${top3.map(([cat,amt],i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--surface2);border-radius:var(--r-sm)"><span class="fw7 fs12">${i+1}. ${cat}</span><span class="fw7 fs12 text-red">${fmt(amt)}</span></div>`).join('')}
@@ -5735,7 +5838,7 @@ function renderLiabChips(){ _liabChipIdx=-1; _renderChips('liab-chips',LIAB_SUGG
 function applyLiabChip(i){ _liabChipIdx=i; const s=LIAB_SUGG[i]; $('f-liab-name').value=s.name; $('f-liab-type').value=s.type; renderLiabChips(); }
 function clearLiabChip(){ _liabChipIdx=-1; $('f-liab-name').value=''; $('f-liab-type').value='loan'; renderLiabChips(); }
 
-const CATS=['Housing','Food','Transport','Bills','Subscriptions','Shopping','Medical','Entertainment','Charity','Investments','Credit Card Payments','Transfers','Other'];
+const CATS=['Housing','Food','Transport','Bills','Subscriptions','Shopping','Medical','Education','Entertainment','Charity','Investments','Credit Card Payments','Fees','Transfers','Other'];
 
 const CAT_KW={
   // Housing — rent/lease/property only; utilities/phone moved to Bills
@@ -5778,9 +5881,9 @@ const CAT_KW={
   Charity:['habitat for humanity','salvation army','united way','charitable','kickstarter','indiegogo','non-profit','nonprofit','gofundme','red cross ','foundation ','goodwill ','donation','offering','gift to ','501c3','501(c)','tithe','church ','charity','donate ','donor','giving ','pledge']
 };
 
-const CAT_CLR={Housing:'#3b82f6',Food:'#10b981',Transport:'#f97316',Bills:'#06b6d4',Subscriptions:'#8b5cf6',Shopping:'#fb923c',Medical:'#38bdf8',Entertainment:'#ec4899',Charity:'#F59E0B',Investments:'#00D4AA',['Credit Card Payments']:'#378ADD',Transfers:'#14b8a6',Other:'#6b7280',Income:'#22c55e'};
-const CAT_ICON={Housing:'🏠',Food:'🍔',Transport:'🚗',Bills:'📋',Subscriptions:'🔄',Shopping:'🛍️',Medical:'🏥',Entertainment:'🎭',Charity:'🤝',Investments:'📈',['Credit Card Payments']:'💳',Transfers:'💸',Other:'📦',Income:'💰'};
-const CAT_REC_PCT={Housing:'25–35%',Food:'10–15%',Transport:'10–15%',Bills:'10–15%',Medical:'3–7%',Entertainment:'3–5%',Shopping:'3–5%',Subscriptions:'3–5%',Charity:'2–5%',Investments:'10–20%',['Credit Card Payments']:'5–15%',Other:'remaining'};
+const CAT_CLR={Housing:'#3b82f6',Food:'#10b981',Transport:'#f97316',Bills:'#06b6d4',Subscriptions:'#8b5cf6',Shopping:'#fb923c',Medical:'#38bdf8',Entertainment:'#ec4899',Charity:'#F59E0B',Investments:'#00D4AA',['Credit Card Payments']:'#378ADD',Transfers:'#14b8a6',Education:'#84cc16',Fees:'#ef4444',Other:'#6b7280',Income:'#22c55e'};
+const CAT_ICON={Housing:'🏠',Food:'🍔',Transport:'🚗',Bills:'📋',Subscriptions:'🔄',Shopping:'🛍️',Medical:'🏥',Entertainment:'🎭',Charity:'🤝',Investments:'📈',['Credit Card Payments']:'💳',Transfers:'💸',Education:'🎓',Fees:'🧾',Other:'📦',Income:'💰'};
+const CAT_REC_PCT={Housing:'25–35%',Food:'10–15%',Transport:'10–15%',Bills:'10–15%',Medical:'3–7%',Entertainment:'3–5%',Shopping:'3–5%',Subscriptions:'3–5%',Charity:'2–5%',Investments:'10–20%',['Credit Card Payments']:'5–15%',Education:'varies',Fees:'avoid',Other:'remaining'};
 const BUDGET_FRAMEWORK={
   '50-30-20':{Housing:25,Food:10,Transport:5,Bills:8,Medical:2,Shopping:10,Entertainment:8,Subscriptions:8,Charity:4,Investments:10,['Credit Card Payments']:5,Other:0},
   '60-20-20':{Housing:30,Food:12,Transport:8,Bills:10,Medical:5,Shopping:7,Entertainment:7,Subscriptions:6,Charity:3,Investments:8,['Credit Card Payments']:4,Other:0}
@@ -5791,6 +5894,13 @@ const INCOME_SRC_CLR={Salary:'#6366f1',DirectDeposit:'#8b5cf6',Government:'#14b8
 // "uber eats" beats "uber" and "amazon prime" beats "amazon".
 // Set to null here; will be rebuilt on first autoCat() call.
 let _kwCache = null;
+
+// Anything the bank charges you for itself — service/maintenance/late/overdraft/ATM/wire/annual/foreign-transaction
+// fees, pay-plan fees, NSF — is a Fee. (HOA fees stay Housing; "coffee" etc. never match because of \b.)
+const FEE_RE=/\b(fees?|overdraft protection|overdraft|nsf|insufficient funds|service charge)\b/i;
+const EDU_RE=/tuition|fairleigh dic|bursar|registrar|student account|textbook|\bchegg\b|coursera|udemy/i;
+function isEduDesc(desc){ return EDU_RE.test(String(desc||'')); }
+function isFeeDesc(desc){ const d=String(desc||''); return FEE_RE.test(d)&&!/\bhoa\b|overdraft protection from/i.test(d)&&!EDU_RE.test(d); }
 
 function recatExistingForCharity(){
   if(!S.transactions) return 0;
@@ -5852,6 +5962,28 @@ function isExcludedFromSpend(t){
   return false;
 }
 
+function recatEducation(){
+  if(!S.transactions) return 0;
+  let n=0;
+  S.transactions.forEach(tx=>{
+    if(tx.override||tx.category==='Education'||tx.internalXfer||tx.isPayment||!(tx.amount<0)) return;
+    if(tx.category==='Credit Card Payments'||tx.category==='Investments') return;
+    if(autoCat(tx.description||tx.desc||'')==='Education'){tx.category='Education';n++;}
+  });
+  return n;
+}
+
+function recatFees(){
+  if(!S.transactions) return 0;
+  let n=0;
+  S.transactions.forEach(tx=>{
+    if(tx.override||tx.category==='Fees'||tx.internalXfer||tx.isPayment||!(tx.amount<0)) return;
+    if(tx.category==='Credit Card Payments'||tx.category==='Investments') return;
+    if(autoCat(tx.description||tx.desc||'')==='Fees'){tx.category='Fees';n++;}
+  });
+  return n;
+}
+
 function recatForNewCats(){
   if(!S.transactions) return 0;
   _kwCache=null;
@@ -5898,6 +6030,8 @@ function autoCat(desc){
   const rules=S.merchantRules||{};
   const ruleKeys=Object.keys(rules).sort((a,b)=>b.length-a.length);
   for(const kw of ruleKeys) if(d.includes(kw)) return rules[kw];
+  if(isEduDesc(desc)) return 'Education';
+  if(isFeeDesc(desc)) return 'Fees';
   // Apple look-through: "APPLE PAY <merchant>" → categorize by the trailing merchant.
   // A trailing space is appended so keywords like 'shell ' still match at end-of-string.
   if(d.includes('apple')){
@@ -6061,6 +6195,7 @@ function getRowFields(rows,fmt){
 
 function sofiCat(type,desc){
   const t=(type||'').toUpperCase().trim();
+  if(isFeeDesc(desc)&&!/refund|reversal|returned/i.test(desc)) return 'Fees';
   if(t==='INTEREST_EARNED') return 'Income';
   if(t==='DIRECT_DEPOSIT') return 'Income';
   if(t==='ZELLE') return 'Transfers';
@@ -6548,7 +6683,7 @@ function _icSourceCardHTML(src){
           :ended
           ?`<button class="btn btn-ghost btn-xs" onclick="_icEditSource('${src.id}')">Edit</button><button class="btn btn-ghost btn-xs" onclick="_icArchiveSource('${src.id}')" title="Archive this ended source">Archive</button>`
           :`<button class="btn btn-ghost btn-xs" onclick="_icArchiveSource('${src.id}')" title="Keep history but exclude from calculations">Archive</button>`}
-        <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="if(confirm('Delete this income source permanently?'))_icDeleteSource('${src.id}')">✕</button>
+        <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="appConfirm('Delete this income source permanently?',{danger:true}).then(function(ok){if(ok)_icDeleteSource('${src.id}')})">✕</button>
       </div>
     </div>
   </div>`;
@@ -7132,6 +7267,7 @@ function saveIncomeQuizResults(){
 // ── VAULT BALANCE RECONSTRUCTION ──────────────────────────────────────────────
 // Reads transaction descriptions to determine vault flow direction,
 // so sign errors in the CSV never corrupt the vault balance.
+function _vaultOpening(name){ const m=AnchorDB.vaultOpening||{}; return +m[String(name).toLowerCase()]||0; }
 function getVaultData(vaultName){
   const nameEsc=vaultName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const nameRe=new RegExp(nameEsc,'i');
@@ -7141,24 +7277,22 @@ function getVaultData(vaultName){
     .filter(t=>nameRe.test(t.description||''))
     .filter(t=>normalizeDate(t.date))
     .sort((a,b)=>normalizeDate(a.date).localeCompare(normalizeDate(b.date)));
-  let balance=0;
-  const monthlyFlow={};
+  const opening=_vaultOpening(vaultName);   // balance before the first CSV row (0 unless matched to SoFi)
+  let balance=opening;
+  const monthlyFlow={},ledger=[];
   vaultTx.forEach(t=>{
     const desc=t.description||'';
-    let delta;
-    if(toRe.test(desc)){
-      delta=Math.abs(t.amount);  // "To [Vault]" = money entering vault
-    } else if(fromRe.test(desc)){
-      delta=-Math.abs(t.amount); // "From [Vault]" = money leaving vault
-    } else {
-      delta=-t.amount;           // fallback: sign flip (withdrawal = into vault)
-    }
+    let delta,rule;
+    if(toRe.test(desc)){ delta=Math.abs(t.amount); rule='to'; }        // "To [Vault]" = money entering vault
+    else if(fromRe.test(desc)){ delta=-Math.abs(t.amount); rule='from'; } // "From [Vault]" = money leaving vault
+    else { delta=-t.amount; rule='flip'; }                              // fallback: sign flip (withdrawal = into vault)
     balance+=delta;
+    ledger.push({t,delta,rule,running:balance});
     const nd=normalizeDate(t.date); if(!nd) return;
     const mo=nd.slice(0,7);
     monthlyFlow[mo]=(monthlyFlow[mo]||0)+delta;
   });
-  return{balance:Math.max(0,balance),transactions:vaultTx,monthlyFlow};
+  return{balance:Math.max(0,balance),raw:balance,opening,ledger,transactions:vaultTx,monthlyFlow};
 }
 
 // Backward-compat wrapper
@@ -7190,6 +7324,7 @@ function syncVirtualAccounts(){
     const entry={
       id,name:vaultName,type:'savings-vault',institution:'SoFi',
       balance:Math.round(data.balance*100)/100,
+      rawBalance:Math.round(data.raw*100)/100,
       lastUpdated:lastTx?normalizeDate(lastTx.date):null,
       transactionCount:data.transactions.length,
       isVirtual:true,monthlyFlow:data.monthlyFlow
@@ -7698,7 +7833,7 @@ function addMerchantRule(){
   if(activeTab==='budget') renderBudget();
 }
 function deleteTx(id){ S.transactions=S.transactions.filter(x=>x.id!==id); save(); renderBudget() }
-function clearTx(){ if(!confirm('Clear all transactions?')) return; S.transactions=[]; save(); renderBudget() }
+async function clearTx(){ if(!await appConfirm('Clear all transactions?',{danger:true,confirmText:'Clear'})) return; S.transactions=[]; save(); renderBudget() }
 
 function openBudgetModal(){
   _bModalMode=S.budgetMode||'dollar';
@@ -7968,6 +8103,10 @@ function _spendingHTML(){
     <div class="bar-wrap bar-wrap-md"><div class="bar-fill ${bPct<80?'bar-green':bPct<100?'bar-yellow':'bar-red'}" style="width:${bPct}%"></div></div>
     ${bPct>=100?'<div class="text-red fs12 mt8">Over budget!</div>':bPct>=80?'<div class="text-yellow fs12 mt8">Approaching budget limit.</div>':''}
   </div>`:''}
+  <div class="card mb16">
+    <div class="flex-sb mb12"><div class="card-title">Where your money went</div><span class="badge badge-purple">Flow</span></div>
+    <div id="money-flow"></div>
+  </div>
   <div class="g2 mb16">
     <div class="card"><div class="card-title mb16">Spending by Category</div><div class="chart-wrap" style="height:240px"><canvas id="budget-chart"></canvas></div></div>
     <div class="card">
@@ -8318,7 +8457,7 @@ function _accountsHTML(){
       ${latestBal!==null&&bh.length>1?`<div class="divider"></div><div class="flex gap16 fs12 text-muted flex-wrap"><span>Balance history:</span><span>High: <span class="fw7 text-green">${fmt(highBal)}</span></span><span>Low: <span class="fw7 ${lowBal<0?'text-red':'text-yellow'}">${fmt(lowBal)}</span></span></div>`:''}
     </div>`;
   }).join('')+(()=>{
-    const vaultAccts=(AnchorDB.virtualAccounts||[]).filter(v=>v.type==='savings-vault'&&v.balance>0);
+    const vaultAccts=(AnchorDB.virtualAccounts||[]).filter(v=>v.type==='savings-vault'&&(v.balance>0||v.transactionCount>0));
     if(!vaultAccts.length) return '';
     return vaultAccts.map(v=>{
       const vd=getVaultData(v.name);
@@ -8335,7 +8474,7 @@ function _accountsHTML(){
             <div class="text-muted fs11">Reconstructed balance</div>
           </div>
         </div>
-        <div class="text-muted fs12 mb12">${v.transactionCount} vault transaction${v.transactionCount!==1?'s':''} · last activity ${v.lastUpdated||'—'} · <span style="color:var(--accent);cursor:pointer;text-decoration:underline" onclick="go('goals')">View in Goals →</span></div>
+        <div class="text-muted fs12 mb12">${v.transactionCount} vault transaction${v.transactionCount!==1?'s':''} · last activity ${v.lastUpdated||'—'} · <span style="color:var(--accent);cursor:pointer;text-decoration:underline" data-v="${esc(v.name)}" onclick="openVaultLedger(this.dataset.v)">How is this calculated?</span> · <span style="color:var(--accent);cursor:pointer;text-decoration:underline" onclick="go('goals')">View in Goals →</span></div>
         ${moKeys.length?`<div class="fs12 fw6 mb6">Monthly vault flow</div>
         <div class="tbl-wrap fs12"><table>
           <thead><tr><th>Month</th><th>Net Flow</th></tr></thead>
@@ -8825,6 +8964,222 @@ function csvGuideHTML(){
   </div>`;
 }
 
+// ── VAULT LEDGER: shows exactly how a reconstructed vault balance is built ────
+function openVaultLedger(name){ window._vlName=name; _renderVaultLedger(); openModal('m-vault-ledger'); }
+function _renderVaultLedger(){
+  const name=window._vlName||'', d=getVaultData(name);
+  const net=d.ledger.reduce((a,x)=>a+x.delta,0);
+  const keyOf=x=>(normalizeDate(x.t.date)||'')+'|'+Math.abs(x.t.amount).toFixed(2);
+  const accts={}; d.ledger.forEach(x=>{(accts[keyOf(x)]=accts[keyOf(x)]||new Set()).add(x.t.account||'')});
+  const ruleTxt={to:'“To …” → into vault',from:'“From …” → out of vault',flip:'no To/From → CSV sign flipped'};
+  let flipN=0,dupN=0,negN=0;
+  const rows=d.ledger.map(x=>{
+    const fl=[];
+    if(x.rule==='flip'){fl.push('sign guessed');flipN++;}
+    if(accts[keyOf(x)].size>1){fl.push('same date+amount in another account');dupN++;}
+    if(x.running<-0.005){fl.push('below $0');negN++;}
+    return `<tr><td style="white-space:nowrap">${esc(normalizeDate(x.t.date))}</td><td style="max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.t.description)}">${esc(x.t.description)}</td><td class="text-muted">${esc(x.t.account||'—')}</td><td class="text-muted">${fmt(x.t.amount)}</td><td class="fs11 text-muted">${ruleTxt[x.rule]}</td><td class="${x.delta>=0?'text-green':'text-red'} fw6">${x.delta>=0?'+':''}${fmt(x.delta)}</td><td class="fw6${x.running<-0.005?' text-red':''}">${fmt(x.running)}</td><td class="fs11 text-yellow">${fl.map(esc).join(' · ')}</td></tr>`;
+  }).reverse().join('');
+  const notes=[];
+  if(!d.opening) notes.push('Anchor assumes this vault held <b>$0</b> before your first CSV row. If it already had money, the balance below is low by exactly that amount. Enter the real balance below to correct it.');
+  if(negN) notes.push(`<b>${negN}</b> row${negN>1?'s':''} push the running balance below $0, which is impossible for a real vault. That usually means a missing opening balance or a wrong direction.`);
+  if(flipN) notes.push(`<b>${flipN}</b> row${flipN>1?'s have':' has'} no “To/From” in the description, so the direction was guessed from the CSV sign.`);
+  if(dupN) notes.push(`<b>${dupN}</b> row${dupN>1?'s share':' shares'} a date and amount with a row in a different account. If that is one transfer exported from two accounts, it is counted twice.`);
+  $('vl-title').textContent=name+' — how this balance is built';
+  $('vl-body').innerHTML=`
+    <div class="text-muted fs12 mb12">Anchor cannot read vault balances from SoFi directly. It rebuilds them from every transaction whose description contains “${esc(name)}”, oldest to newest.</div>
+    <div class="g3 mb12" style="gap:10px">
+      <div style="background:var(--surface2);border-radius:var(--r-sm);padding:12px;text-align:center"><div class="fw8" style="font-size:18px">${fmt(d.opening)}</div><div class="text-muted fs11 mt6">Opening balance${d.opening?' (set by you)':' (assumed)'}</div></div>
+      <div style="background:var(--surface2);border-radius:var(--r-sm);padding:12px;text-align:center"><div class="fw8 ${net>=0?'text-green':'text-red'}" style="font-size:18px">${net>=0?'+':''}${fmt(net)}</div><div class="text-muted fs11 mt6">Net of ${d.ledger.length} transaction${d.ledger.length!==1?'s':''}</div></div>
+      <div style="background:var(--surface2);border-radius:var(--r-sm);padding:12px;text-align:center"><div class="fw8 ${d.raw<-0.005?'text-red':'text-green'}" style="font-size:18px">${fmt(d.raw)}</div><div class="text-muted fs11 mt6">Reconstructed balance${d.raw<-0.005?' (shown as $0.00)':''}</div></div>
+    </div>
+    ${notes.length?`<div class="alert-info mb12" style="font-size:12px;line-height:1.6;border-radius:var(--r-sm);padding:10px 12px">${notes.map(n=>`<div>• ${n}</div>`).join('')}</div>`:''}
+    <div class="flex gap8 mb16" style="align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px"><label class="dlg-label" for="vl-actual">Balance SoFi shows for this vault today</label>
+        <div class="dlg-field has-prefix"><span class="dlg-prefix">$</span><input class="form-input" id="vl-actual" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off"></div></div>
+      <button class="btn btn-primary" onclick="vaultMatchActual()">Match to SoFi</button>
+      ${d.opening?'<button class="btn btn-ghost" onclick="vaultClearOpening()">Reset to $0 start</button>':''}
+    </div>
+    <div class="tbl-wrap fs12" style="max-height:340px;overflow:auto"><table>
+      <thead><tr><th>Date</th><th>Description</th><th>Account</th><th>CSV amount</th><th>Rule used</th><th>Effect</th><th>Running</th><th>Flags</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="8" class="text-muted">No transactions mention this vault.</td></tr>'}</tbody>
+    </table></div>
+    <div class="text-muted fs11 mt8">Newest first. “Match to SoFi” sets the opening balance so the reconstructed balance equals the number you type; the transactions themselves are never changed.</div>`;
+}
+function _vaultRefresh(){ try{syncVirtualAccounts();}catch(_){} save(); _renderVaultLedger(); try{ if(activeTab==='networth')renderNW(); else if(activeTab==='goals')renderGoals(); else if(activeTab==='home')renderHome(); }catch(_){} }
+function vaultMatchActual(){
+  const name=window._vlName||'', v=parseFloat(String($('vl-actual').value).replace(/[$,\s]/g,''));
+  if(isNaN(v)||v<0){ appAlert('Enter the balance SoFi shows for this vault, for example 224.53.'); return; }
+  const net=getVaultData(name).ledger.reduce((a,x)=>a+x.delta,0);
+  AnchorDB.vaultOpening=AnchorDB.vaultOpening||{};
+  AnchorDB.vaultOpening[name.toLowerCase()]=Math.round((v-net)*100)/100;
+  _vaultRefresh();
+}
+async function vaultClearOpening(){
+  if(!await appConfirm('Go back to assuming this vault started at $0?',{confirmText:'Reset'})) return;
+  if(AnchorDB.vaultOpening) delete AnchorDB.vaultOpening[(window._vlName||'').toLowerCase()];
+  _vaultRefresh();
+}
+
+// ── IN-APP DIALOGS (replace native prompt / confirm / alert) ─────────────────
+let _dlgQueue=Promise.resolve();
+function _appDlg(cfg){
+  const job=()=>new Promise(resolve=>{
+    const ov=$('app-dlg'),titleEl=$('app-dlg-title'),body=$('app-dlg-body'),acts=$('app-dlg-actions');
+    const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const prevFocus=document.activeElement;
+    const inp=cfg.input;
+    let done=false,obs=null;
+    titleEl.textContent=cfg.title||'';
+    titleEl.style.display=cfg.title?'':'none';
+    body.innerHTML=(cfg.message?`<div class="dlg-msg">${esc(cfg.message)}</div>`:'')
+      +(inp?`${inp.label?`<label class="dlg-label" for="app-dlg-input">${esc(inp.label)}</label>`:''}<div class="dlg-field${inp.prefix?' has-prefix':''}">${inp.prefix?`<span class="dlg-prefix">${esc(inp.prefix)}</span>`:''}<input class="form-input" id="app-dlg-input" type="text" autocomplete="off" inputmode="${esc(inp.inputmode||'text')}" placeholder="${esc(inp.placeholder||'')}" value="${esc(inp.value)}"></div><div class="dlg-err" id="app-dlg-err" role="alert"></div>`:'');
+    acts.innerHTML='';
+    function finish(v){
+      if(done) return; done=true;
+      document.removeEventListener('keydown',onKey,true);
+      if(obs) obs.disconnect();
+      ov.onclick=null; ov.classList.remove('open');
+      try{ if(prevFocus&&prevFocus.focus) prevFocus.focus(); }catch(_){}
+      resolve(v);
+    }
+    function cancel(){ finish(cfg.cancelValue); }
+    function submit(){
+      if(!inp){ finish(cfg.okValue); return; }
+      const el=$('app-dlg-input'), v=el.value.trim();
+      const err=inp.validate?inp.validate(v):'';
+      if(err){ $('app-dlg-err').textContent=err; el.focus(); return; }
+      finish(v);
+    }
+    function onKey(e){
+      if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); cancel(); return; }
+      if(e.key==='Enter'&&!(e.target&&e.target.tagName==='BUTTON')){ e.preventDefault(); submit(); return; }
+      if(e.key==='Tab'){
+        const f=[...ov.querySelectorAll('input,button')].filter(x=>!x.disabled&&x.offsetParent!==null);
+        if(!f.length) return;
+        const i=f.indexOf(document.activeElement);
+        if(e.shiftKey&&i<=0){ e.preventDefault(); f[f.length-1].focus(); }
+        else if(!e.shiftKey&&i===f.length-1){ e.preventDefault(); f[0].focus(); }
+      }
+    }
+    let cancelBtn=null;
+    if(!cfg.noCancel){
+      cancelBtn=document.createElement('button'); cancelBtn.className='btn btn-ghost';
+      cancelBtn.textContent=cfg.cancelText||'Cancel'; cancelBtn.onclick=cancel; acts.appendChild(cancelBtn);
+    }
+    const okBtn=document.createElement('button'); okBtn.className='btn '+(cfg.danger?'btn-danger':'btn-primary');
+    okBtn.textContent=cfg.confirmText||'OK'; okBtn.onclick=submit; acts.appendChild(okBtn);
+    ov.onclick=e=>{ if(e.target===ov) cancel(); };
+    // the page's global overlay handler can close us on backdrop click; make sure the promise still settles
+    obs=new MutationObserver(()=>{ if(!ov.classList.contains('open')) finish(cfg.cancelValue); });
+    obs.observe(ov,{attributes:true,attributeFilter:['class']});
+    document.addEventListener('keydown',onKey,true);
+    ov.classList.add('open');
+    setTimeout(()=>{
+      const t=inp?$('app-dlg-input'):((cfg.danger&&cancelBtn)?cancelBtn:okBtn);
+      if(t){ t.focus(); if(inp&&t.select) t.select(); }
+    },30);
+  });
+  const p=_dlgQueue.then(job,job);   // one dialog at a time, in order
+  _dlgQueue=p.catch(()=>{});
+  return p;
+}
+// appConfirm(msg,{danger,confirmText,title}) -> Promise<boolean>
+function appConfirm(message,o){ o=o||{}; return _appDlg({title:o.title||'Are you sure?',message,confirmText:o.confirmText||(o.danger?'Delete':'Confirm'),cancelText:o.cancelText||'Cancel',danger:!!o.danger,cancelValue:false,okValue:true}); }
+// appAlert(msg) -> Promise<void>
+function appAlert(message,o){ o=o||{}; return _appDlg({title:o.title||'Notice',message,confirmText:'OK',noCancel:true,cancelValue:undefined,okValue:undefined}); }
+// appPrompt(title,{label,prefix,value,placeholder,inputmode,confirmText,validate}) -> Promise<string|null>
+function appPrompt(title,o){ o=o||{}; return _appDlg({title,message:o.message,input:{label:o.label,prefix:o.prefix,value:o.value,placeholder:o.placeholder,inputmode:o.inputmode,validate:o.validate},confirmText:o.confirmText||'Save',cancelText:'Cancel',cancelValue:null}); }
+window.alert=function(msg){ appAlert(msg); };   // every existing alert() now shows in-app
+
+// ── MONEY FLOW (Sankey-style: income -> spending categories) ──────────────────
+function _moneyFlowData(){
+  // Same filters as _spendingHTML so the chart always matches the cards,
+  // except merchant refunds: a refund reverses earlier spending, it is not income.
+  const allTx=(txAccFilter?S.transactions.filter(t=>t.account===txAccFilter):S.transactions).filter(t=>txInRange(t));
+  const expenses=allTx.filter(t=>t.amount<0&&!isExcludedFromSpend(t));
+  const credits=allTx.filter(t=>t.amount>0&&!t.internalXfer&&!t.isPayment);
+  const refundTx=credits.filter(t=>t.incomeType==='Refund');
+  const income=credits.filter(t=>t.incomeType!=='Refund').reduce((a,t)=>a+t.amount,0);
+  const byCat={};
+  expenses.forEach(t=>{const c=t.category||'Other';byCat[c]=(byCat[c]||0)+Math.abs(t.amount)});
+  // Net each refund against the category of the purchase it reverses.
+  // Match on merchant (latest purchase from the same merchant, any date), else keyword category, else Other.
+  let refunded=0,excess=0;
+  if(refundTx.length){
+    const lastCat={};
+    S.transactions.forEach(x=>{
+      if(!(x.amount<0)||x.internalXfer) return;
+      const k=normalizeMerchant(x.description); if(!k) return;
+      const nd=normalizeDate(x.date)||'';
+      if(!lastCat[k]||nd>lastCat[k].d) lastCat[k]={d:nd,c:x.category};
+    });
+    refundTx.forEach(t=>{
+      const clean=(t.description||'').replace(/\b(refund(ed)?|return(ed)?|reversal|credit|reimbursement|from)\b/gi,' ').replace(/\s+/g,' ').trim();
+      const hit=lastCat[normalizeMerchant(clean)];
+      const cat=(hit&&hit.c)||autoCat(clean)||'Other';
+      const have=byCat[cat]||0, take=Math.min(have,t.amount);
+      if(take>0) byCat[cat]=have-take;
+      refunded+=t.amount; excess+=t.amount-take;   // excess = refund for a purchase outside this range/view
+    });
+  }
+  const spent=Object.values(byCat).reduce((a,b)=>a+b,0);
+  const inflow=income+excess;
+  let rows=Object.entries(byCat).filter(([,v])=>v>0.005).sort((a,b)=>b[1]-a[1]);
+  const MAX=6;
+  if(rows.length>MAX){
+    const rest=rows.slice(MAX).reduce((a,[,v])=>a+v,0);
+    rows=rows.slice(0,MAX);
+    rows.push(['Everything else',rest]);
+  }
+  const ramp=['#6d28d9','#7c3aed','#8b5cf6','#a78bfa','#c4b5fd','#ddd6fe'];
+  const categories=rows.map(([label,value],i)=>({label,value,color:label==='Everything else'?'#9ca3af':ramp[Math.min(i,ramp.length-1)]}));
+  if(inflow>spent) categories.push({label:'Left over',value:inflow-spent,color:'var(--green)'});
+  return {income,spent,categories,total:categories.reduce((a,c)=>a+c.value,0),over:(inflow>0&&spent>inflow)?spent-inflow:0,refunded,excess};
+}
+
+function renderMoneyFlow(el,d){
+  if(!el) return;
+  const card=el.closest('.card');
+  if(!d||!d.categories.length||d.total<=0){ if(card) card.style.display='none'; return; }
+  if(card) card.style.display='';
+  const NS='http://www.w3.org/2000/svg';
+  const W=Math.max(el.clientWidth||320,260);
+  const labelW=W<420?150:190;
+  const nodeW=12,rowH=34,gap=10,pad=10;
+  const n=d.categories.length;
+  const H=n*(rowH+gap)-gap+pad*2;
+  const srcH=H-pad*2;
+  const tgtX=W-labelW-nodeW;
+  const x0=nodeW,x1=tgtX,midX=(x0+x1)/2;
+  const mk=(tag,attrs)=>{const e=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));return e};
+  const svg=mk('svg',{viewBox:`0 0 ${W} ${H}`,width:'100%',height:H,role:'img','aria-label':'Where your money went: income flowing into spending categories'});
+  svg.appendChild(mk('rect',{x:0,y:pad,width:nodeW,height:srcH,rx:4,style:'fill:var(--accent)'}));
+  let cursor=pad;
+  d.categories.forEach((c,i)=>{
+    const bandH=c.value/d.total*srcH;
+    const y0t=cursor,y0b=cursor+bandH;cursor+=bandH;
+    const rowY=pad+i*(rowH+gap),y1t=rowY,y1b=rowY+rowH;
+    const pctTxt=Math.round(c.value/d.total*100);
+    const band=mk('path',{d:`M ${x0} ${y0t} C ${midX} ${y0t}, ${midX} ${y1t}, ${x1} ${y1t} L ${x1} ${y1b} C ${midX} ${y1b}, ${midX} ${y0b}, ${x0} ${y0b} Z`,class:'mf-band','fill-opacity':'.5',style:`fill:${c.color}`});
+    const tip=mk('title',{});tip.textContent=`${c.label}: ${fmt(c.value)} (${pctTxt}%)`;band.appendChild(tip);
+    svg.appendChild(band);
+    svg.appendChild(mk('rect',{x:tgtX,y:rowY,width:nodeW,height:rowH,rx:4,style:`fill:${c.color}`}));
+    const lbl=mk('text',{x:tgtX+nodeW+8,y:rowY+15,style:'fill:var(--text);font-size:13px;font-weight:600'});lbl.textContent=c.label;svg.appendChild(lbl);
+    const val=mk('text',{x:tgtX+nodeW+8,y:rowY+30,style:'fill:var(--muted);font-size:11px'});val.textContent=`${fmt(c.value)} (${pctTxt}%)`;svg.appendChild(val);
+  });
+  const base=d.over>0?`Spending ${fmt(d.spent)} · ${fmt(d.over)} over income`:(d.income>0?`Income ${fmt(d.income)}`:`Total spending ${fmt(d.spent)}`);
+  const cap=base+(d.refunded>0?` · ${fmt(d.refunded)} in refunds netted against spending`:'');
+  el.innerHTML=`<div class="flex gap6 fs12 mb8"><span class="dot" style="background:var(--accent)"></span><span class="text-muted">${cap}</span></div>`;
+  el.appendChild(svg);
+}
+
+let _mfResizeT=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(_mfResizeT);
+  _mfResizeT=setTimeout(()=>{const e=$('money-flow');if(e&&activeTab==='budget'&&bSub==='spending')renderMoneyFlow(e,_moneyFlowData())},150);
+});
+
 function renderBudget(){
   const el=$('budget-body');
   ['budget','trends-total','trends-cat','trends-netflow','income-source','income-trend','income-cashflow'].forEach(k=>killChart(k));
@@ -8843,6 +9198,7 @@ function renderBudget(){
   setTimeout(()=>{
     if(bSub==='spending'){
       killChart('budget');
+      renderMoneyFlow($('money-flow'),_moneyFlowData());
       const ctx=$('budget-chart');if(!ctx)return;
       const expenses=(txAccFilter?S.transactions.filter(t=>t.account===txAccFilter):S.transactions).filter(t=>t.amount<0&&!t.internalXfer&&txInRange(t));
       const spent=expenses.reduce((a,t)=>a+Math.abs(t.amount),0);
@@ -9111,7 +9467,7 @@ function saveAsset(){
   else S.assets.push({id:uid(),name,type,value});
   save(); closeModal('m-asset'); renderNW(); showSaveToast('Asset saved');
 }
-function deleteAsset(id){ if(!confirm('Delete?')) return; S.assets=S.assets.filter(x=>x.id!==id); save(); renderNW() }
+async function deleteAsset(id){ if(!await appConfirm('Delete?',{danger:true,confirmText:'Delete'})) return; S.assets=S.assets.filter(x=>x.id!==id); save(); renderNW() }
 
 function openLiabModal(id){
   editId=id||null;
@@ -9131,14 +9487,14 @@ function saveLiab(){
   else S.liabilities.push({id:uid(),name,type,value});
   save(); closeModal('m-liability'); renderNW(); showSaveToast('Liability saved');
 }
-function deleteLiab(id){ if(!confirm('Delete?')) return; S.liabilities=S.liabilities.filter(x=>x.id!==id); save(); renderNW() }
+async function deleteLiab(id){ if(!await appConfirm('Delete?',{danger:true,confirmText:'Delete'})) return; S.liabilities=S.liabilities.filter(x=>x.id!==id); save(); renderNW() }
 
 function logNW(){
   autoLogNW();
   save(); renderNW();
 }
 function deleteNWEntry(date){ S.nwHistory=S.nwHistory.filter(h=>h.date!==date); save(); renderNW() }
-function clearNW(){ if(!confirm('Clear all net worth history?')) return; S.nwHistory=[]; save(); renderNW() }
+async function clearNW(){ if(!await appConfirm('Clear all net worth history?',{danger:true,confirmText:'Clear'})) return; S.nwHistory=[]; save(); renderNW() }
 
 function renderNW(){
   const el=$('nw-body');
@@ -9301,7 +9657,7 @@ function renderNW(){
                 <span style="color:var(--teal);font-size:11px" title="Reconstructed from transactions">↻</span>${esc(v.name)}
                 <span class="badge fs10" style="background:var(--surface3);color:var(--muted);padding:1px 5px">virtual</span>
               </div>
-              <div class="fs11 text-muted">${v.transactionCount} vault tx · updated ${v.lastUpdated||'—'}</div>
+              <div class="fs11 text-muted">${v.transactionCount} vault tx · updated ${v.lastUpdated||'—'} · <span style="color:var(--accent);cursor:pointer;text-decoration:underline" data-v="${esc(v.name)}" onclick="openVaultLedger(this.dataset.v)">how?</span></div>
             </div>
             <span class="fw7 text-green">${fmt(v.balance)}</span>
           </div>`).join('')}
@@ -9379,7 +9735,7 @@ function renderNW(){
       <div class="card-title mb12">SoFi Account Summary</div>
       <div class="g${Math.min(sofiTotals.length+(efData.balance>0?1:0),4)} mb16">
         ${sofiTotals.map(a=>{const chg=a.prev!==null?a.balance-a.prev:null;return `<div style="background:var(--surface2);border-radius:var(--r-sm);padding:14px;text-align:center"><div class="fw7 fs11 text-muted mb6">${esc(a.name)}</div><div class="fw8 text-green" style="font-size:20px">${fmt(a.balance)}</div>${chg!==null?`<div class="fs11 ${chg>=0?'text-green':'text-red'} mt4">${chg>=0?'+':''}${fmt(chg)} last period</div>`:''}</div>`;}).join('')}
-        ${efData.balance>0?`<div style="background:var(--surface2);border-radius:var(--r-sm);padding:14px;text-align:center"><div class="fw7 fs11 text-muted mb6">Emergency Fund</div><div class="fw8 text-green" style="font-size:20px">${fmt(efData.balance)}</div><div class="fs11 text-muted mt4">reconstructed</div></div>`:''}
+        ${efData.balance>0?`<div style="background:var(--surface2);border-radius:var(--r-sm);padding:14px;text-align:center"><div class="fw7 fs11 text-muted mb6">Emergency Fund</div><div class="fw8 text-green" style="font-size:20px">${fmt(efData.balance)}</div><div class="fs11 text-muted mt4">reconstructed · <span style="color:var(--accent);cursor:pointer;text-decoration:underline" data-v="Emergency Fund Vault" onclick="openVaultLedger(this.dataset.v)">how?</span></div></div>`:''}
       </div>
       <div class="g3 mb12" style="gap:8px">
         <div style="background:var(--surface2);border-radius:var(--r-sm);padding:12px;text-align:center"><div class="fw8 text-green" style="font-size:18px">${fmt(combinedSofi)}</div><div class="text-muted fs11 mt6">Combined SoFi Total</div></div>
@@ -9436,7 +9792,7 @@ function saveGoal(){
   else S.goals.push({id:uid(),name,target,current,targetDate});
   save(); closeModal('m-goal'); renderGoals(); showSaveToast('Goal saved');
 }
-function deleteGoal(id){ if(!confirm('Delete this goal?')) return; S.goals=S.goals.filter(x=>x.id!==id); save(); renderGoals() }
+async function deleteGoal(id){ if(!await appConfirm('Delete this goal?',{danger:true,confirmText:'Delete'})) return; S.goals=S.goals.filter(x=>x.id!==id); save(); renderGoals() }
 
 function monthsLeft(dateStr){
   if(!dateStr) return null;
@@ -9604,7 +9960,7 @@ function saveSub(){
   else S.subs.push({id:uid(),name,amount,cycle,category,nextBilling,paused:false});
   save(); closeModal('m-sub'); renderSubs(); showSaveToast('Subscription saved');
 }
-function deleteSub(id){ if(!confirm('Delete subscription?')) return; S.subs=S.subs.filter(x=>x.id!==id); save(); renderSubs() }
+async function deleteSub(id){ if(!await appConfirm('Delete subscription?',{danger:true,confirmText:'Delete'})) return; S.subs=S.subs.filter(x=>x.id!==id); save(); renderSubs() }
 function togglePause(id){ const s=S.subs.find(x=>x.id===id); if(s){ s.paused=!s.paused; DataStore.sync('sub-pause'); } renderSubs(); }
 
 function renderSubs(){
@@ -9740,7 +10096,7 @@ function saveBill(){
   else S.bills.push({id:uid(),name,amount,cycle,category,nextDue,paused:false});
   save(); closeModal('m-bill'); renderBills(); showSaveToast('Bill saved');
 }
-function deleteBill(id){ if(!confirm('Delete this bill?')) return; S.bills=S.bills.filter(x=>x.id!==id); save(); renderBills(); }
+async function deleteBill(id){ if(!await appConfirm('Delete this bill?',{danger:true,confirmText:'Delete'})) return; S.bills=S.bills.filter(x=>x.id!==id); save(); renderBills(); }
 function toggleBillPause(id){ const b=(S.bills||[]).find(x=>x.id===id); if(b){ b.paused=!b.paused; DataStore.sync('bill-pause'); } renderBills(); }
 
 function renderBills(){
@@ -9865,9 +10221,9 @@ function openDataSummary(){
   openModal('m-datasummary');
 }
 
-function clearAllData(){
-  if(!confirm('Permanently delete ALL data — transactions, cards, goals, subscriptions, settings? This cannot be undone.')) return;
-  if(!confirm('Are you absolutely sure? This will wipe everything.')) return;
+async function clearAllData(){
+  if(!await appConfirm('Permanently delete ALL data — transactions, cards, goals, subscriptions, settings? This cannot be undone.',{danger:true,confirmText:'Delete everything'})) return;
+  if(!await appConfirm('Are you absolutely sure? This will wipe everything.',{danger:true,confirmText:'Delete everything'})) return;
   DataStore._reset();
   localStorage.removeItem('anchor_db');
   localStorage.removeItem('findash2');
@@ -9938,8 +10294,8 @@ function saveInvest(){
   save(); closeModal('m-invest'); renderInvest(); showSaveToast('Investment account saved');
 }
 
-function deleteInvest(id){
-  if(!confirm('Delete this investment account?')) return;
+async function deleteInvest(id){
+  if(!await appConfirm('Delete this investment account?',{danger:true,confirmText:'Delete'})) return;
   S.investments=S.investments.filter(x=>x.id!==id);
   syncInvestToAssets();
   save(); renderInvest();
@@ -10431,6 +10787,8 @@ if((S.investments||[]).length){ (S.investments||[]).forEach(_syncInvValue); sync
 syncCardLiabilities();
 const _charityCatFixed=recatExistingForCharity(); if(_charityCatFixed>0) console.log('[Recat] Moved',_charityCatFixed,'transaction(s) to Charity');
 initDefaultMerchantRules();
+if(!AnchorDB.feesRecatV1){ const _feesFixed=recatFees(); AnchorDB.feesRecatV1=true; if(_feesFixed>0){ console.log('[Recat] Moved',_feesFixed,'fee transaction(s) to Fees'); save(); } }
+if(!AnchorDB.eduRecatV1){ const _eduFixed=recatEducation(); AnchorDB.eduRecatV1=true; if(_eduFixed>0){ console.log('[Recat] Moved',_eduFixed,'school transaction(s) to Education'); save(); } }
 const _newCatFixed=recatForNewCats(); if(_newCatFixed>0) console.log('[Recat] Moved',_newCatFixed,'transaction(s) to Investments/Credit Card Payments');
 const _vaultInit=syncVirtualAccounts(); if(_vaultInit.vaults.length) console.log('[Vaults] Synced',_vaultInit.vaults.length,'virtual vault(s):',_vaultInit.vaults.map(v=>v.name+' $'+v.balance).join(', '));
 const _incomeFixed=reclassifyExistingIncome(); if(_incomeFixed>0) console.log('[Income] Fixed',_incomeFixed,'mis-classified income transaction(s)');
